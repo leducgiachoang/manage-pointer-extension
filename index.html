@@ -19,7 +19,8 @@
     <div id="app" class="container-fluid">
         <div class="row">
             <div class="col-6 ">
-
+                <input @change="handleActionIMGs" type="file" multiple ref="file_choose" style="display: none;" accept="image/png, image/jpeg" />
+                <div @click="() => this.$refs.file_choose.click()" @drop="dropHandler" @dragover="dragOverHandler" style="height: 100px;display: flex;" class="w-full shadow-lg rounded mt-2 flex justify-content-center align-items-center ">Drag File</div>
                 <form class="box_form">
                     <div v-if="id_update !== null">Update by id: {{ id_update }}</div>
                     <div class="">
@@ -108,6 +109,95 @@
                 this.getCursor()
             },
             methods: {
+                async handleActionIMGs(e){
+                    const files = e.target.files;
+                    for(var a = 0; a < files.length; a++){
+                        // max
+                        this.importFile(files[a]);
+                    }
+                },
+                async importFile(file){
+                    const src = await this.getBase64(file);
+                    const size = await this.imageSize(src);
+                    const ratio = 25 / size.width;
+                    const height = size.height * ratio;
+                    const name = file.name;
+                    // min
+                    const url = await this.resizedataURL(src, 25, height);
+                    this.data = [{
+                        id: this.getNextID(this.data.map(e => e.id)),
+                        src, url,name
+                    }, ...this.data];
+                },
+                imageSize(url) {
+                    const img = document.createElement("img");
+
+                    const promise = new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        const width  = img.naturalWidth;
+                        const height = img.naturalHeight; 
+                        resolve({width, height});
+                    };
+                    img.onerror = reject;
+                    });
+                    img.src = url;
+
+                    return promise;
+                },
+                dropHandler(ev){
+                    console.log("File(s) dropped");
+
+                    // Prevent default behavior (Prevent file from being opened)
+                    ev.preventDefault();
+                    
+                    if (ev.dataTransfer.items) {
+                        // Use DataTransferItemList interface to access the file(s)
+                        [...ev.dataTransfer.items].forEach((item, i) => {
+                        // If dropped items aren't files, reject them
+                        if (item.kind === "file") {
+                            const file = item.getAsFile();
+                            this.importFile(file);
+                            // console.log(`… file[${i}].name = ${file.name}`);
+                        }
+                        });
+                    } else {
+                        // Use DataTransfer interface to access the file(s)
+                        [...ev.dataTransfer.files].forEach((file, i) => {
+                        console.log(`… file[${i}].name = ${file.name}`);
+                        });
+                    }
+                },
+                dragOverHandler(ev){
+                    // console.log(ev)
+                    console.log("File(s) in drop zone");
+                    
+                    // Prevent default behavior (Prevent file from being opened)
+                    ev.preventDefault();
+                },
+                getBase64(file) {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = error => reject(error);
+                    });
+                },
+                resizedataURL(datas, wantedWidth, wantedHeight){
+                    return new Promise(async function(resolve,reject){
+                        var img = document.createElement('img');
+                        img.onload = function()
+                        {        
+                            var canvas = document.createElement('canvas');
+                            var ctx = canvas.getContext('2d');
+                            canvas.width = wantedWidth;
+                            canvas.height = wantedHeight;
+                            ctx.drawImage(this, 0, 0, wantedWidth, wantedHeight);
+                            var dataURI = canvas.toDataURL();
+                            resolve(dataURI);
+                        };
+                        img.src = datas;
+                    })
+                },
                 handleCopy() {
                     navigator.clipboard.writeText(JSON.stringify(this.data));
                     alert("Copied OKE");
